@@ -44,6 +44,8 @@ RULES (follow all of them):
    - "last N days" = order_date >= date('{today}', '-N days')
 5. Show human-readable columns (names, not only ids). Give computed columns clear aliases (e.g. AS total_revenue). Round money to 2 decimals with ROUND(x, 2).
 6. For "top N" questions use ORDER BY ... DESC LIMIT N. For queries that could return many rows, add LIMIT {max_rows}.
+   When the question asks "which <things>" (which products, which customers, ...), return one row per thing with its name - not only a count or a single value describing them.
+   For comparisons with the previous period (change, growth, difference, LAG), calculate over data that also includes the period just before the requested range, and filter to the requested range in an outer query, so the first row is compared with its real previous period. Never turn a missing value (NULL) into 0 unless the question asks for it.
 7. Return ONLY the SQL. No explanation, no markdown, no code fences.
 8. If the question cannot be answered with this schema (the data does not exist, or it asks to change data, or it is not about this database), return exactly:
    {cannot_answer}: <one short sentence explaining why>

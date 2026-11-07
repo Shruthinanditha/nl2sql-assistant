@@ -22,7 +22,8 @@ database_description: >
 
 # Business rules the LLM must follow. These are added to the prompt as notes.
 notes:
-  - "Revenue / sales / spending means orders with status = 'completed' only, unless the question explicitly asks about other statuses."
+  - "Revenue / sales / spending / units sold means orders with status = 'completed' only, unless the question explicitly asks about other statuses."
+  - "Counting orders, or asking which customers placed / made an order, includes ALL statuses (completed, cancelled and pending). Only filter on status when the question mentions a status, revenue, sales, spending or units sold."
   - "For order-level money use orders.total. For product- or category-level money use order_items.quantity * order_items.unit_price."
   - "order_items.unit_price is the price actually paid (may include a discount); products.price is today's list price."
   - "Some customers have a NULL city. Some customers have never placed an order."

@@ -130,6 +130,14 @@ def test_repair_happens_at_most_once(log_file):
     assert "ntile" in result.message.lower()
 
 
+def test_repair_can_be_switched_off(log_file):
+    """The evaluation measures the system with and without self-repair."""
+    fake = FakeLLM(queued_responses=["SELECT nme FROM customers", "SELECT name FROM customers"])
+    result = ask("q", llm=fake, today=TODAY, log_path=log_file, allow_repair=False)
+    assert result.status == STATUS_ERROR or result.status == STATUS_BLOCKED
+    assert len(fake.calls) == 1
+
+
 def test_repaired_sql_is_validated_again(log_file):
     """A 'repair' that turns malicious is still blocked."""
     fake = FakeLLM(queued_responses=["SELECT nme FROM customers", "SELECT * FROM users_private"])

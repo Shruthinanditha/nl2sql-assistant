@@ -1,0 +1,213 @@
+{
+  "label": "holdout_baseline",
+  "timestamp": "2026-11-07T12:27:52",
+  "today": "2026-11-07",
+  "provider": "gemini",
+  "model": "gemini-3.5-flash-lite",
+  "repair_enabled": false,
+  "questions_file": "eval/holdout.yaml",
+  "summary": {
+    "overall_accuracy": 75.0,
+    "answerable_accuracy": 75.0,
+    "refusal_rate_unsafe": null,
+    "correct": 6,
+    "total": 8,
+    "by_difficulty": {
+      "easy": {
+        "correct": 1,
+        "total": 1
+      },
+      "medium": {
+        "correct": 3,
+        "total": 4
+      },
+      "hard": {
+        "correct": 2,
+        "total": 3
+      }
+    },
+    "false_refusals": 0,
+    "repairs_used": 0,
+    "avg_seconds": 8.14,
+    "p90_seconds": 11.54,
+    "tokens": {
+      "input": 15122,
+      "output": 763,
+      "thinking": 0
+    }
+  },
+  "failures": [
+    {
+      "id": "HO1",
+      "difficulty": "medium",
+      "question": "How many orders did each customer from Pune place this year?",
+      "correct": false,
+      "reason": "wrong result (14 rows vs 13 expected)",
+      "status": "success",
+      "repaired": false,
+      "failed_check": null,
+      "generated_sql": "SELECT c.name AS customer_name, COUNT(o.id) AS order_count\nFROM customers AS c\nLEFT JOIN orders AS o ON o.customer_id = c.id AND o.order_date >= date('2026-11-07', 'start of year')\nWHERE c.city = 'Pune'\nGROUP BY c.id, c.name\nORDER BY order_count DESC, c.name;",
+      "seconds": 4.97,
+      "tokens": {
+        "input": 1887,
+        "output": 96,
+        "thinking": 0
+      }
+    },
+    {
+      "id": "HO4",
+      "difficulty": "hard",
+      "question": "Show the number of orders per month for the last 6 months and the difference from the previous month.",
+      "correct": false,
+      "reason": "wrong result (6 rows vs 6 expected)",
+      "status": "success",
+      "repaired": false,
+      "failed_check": null,
+      "generated_sql": "WITH monthly_orders AS (\n    SELECT \n        strftime('%Y-%m', order_date) AS month,\n        COUNT(*) AS order_count\n    FROM orders\n    WHERE status = 'completed'\n      AND order_date >= date('2026-11-07', 'start of month', '-5 months')\n    GROUP BY strftime('%Y-%m', order_date)\n)\nSELECT \n    month,\n    order_count,\n    order_count - LAG(order_count, 1) OVER (ORDER BY month) AS difference_from_previous_month\nFROM monthly_orders\nORDER BY month\nLIMIT 500;",
+      "seconds": 1.93,
+      "tokens": {
+        "input": 1896,
+        "output": 149,
+        "thinking": 0
+      }
+    }
+  ],
+  "records": [
+    {
+      "id": "HO1",
+      "difficulty": "medium",
+      "question": "How many orders did each customer from Pune place this year?",
+      "correct": false,
+      "reason": "wrong result (14 rows vs 13 expected)",
+      "status": "success",
+      "repaired": false,
+      "failed_check": null,
+      "generated_sql": "SELECT c.name AS customer_name, COUNT(o.id) AS order_count\nFROM customers AS c\nLEFT JOIN orders AS o ON o.customer_id = c.id AND o.order_date >= date('2026-11-07', 'start of year')\nWHERE c.city = 'Pune'\nGROUP BY c.id, c.name\nORDER BY order_count DESC, c.name;",
+      "seconds": 4.97,
+      "tokens": {
+        "input": 1887,
+        "output": 96,
+        "thinking": 0
+      }
+    },
+    {
+      "id": "HO2",
+      "difficulty": "hard",
+      "question": "Which customers placed orders in both September and October 2026?",
+      "correct": true,
+      "reason": "result matches reference",
+      "status": "success",
+      "repaired": false,
+      "failed_check": null,
+      "generated_sql": "SELECT c.name AS customer_name, c.city, c.country\nFROM customers AS c\nJOIN orders AS o ON o.customer_id = c.id\nWHERE o.order_date >= '2026-09-01' AND o.order_date < '2026-10-01'\nINTERSECT\nSELECT c.name AS customer_name, c.city, c.country\nFROM customers AS c\nJOIN orders AS o ON o.customer_id = c.id\nWHERE o.order_date >= '2026-10-01' AND o.order_date < '2026-11-01'\nORDER BY customer_name\nLIMIT 500;",
+      "seconds": 10.76,
+      "tokens": {
+        "input": 1890,
+        "output": 168,
+        "thinking": 0
+      }
+    },
+    {
+      "id": "HO3",
+      "difficulty": "hard",
+      "question": "Which customers live in the city that has the most customers?",
+      "correct": true,
+      "reason": "result matches reference",
+      "status": "success",
+      "repaired": false,
+      "failed_check": null,
+      "generated_sql": "SELECT name, city, country, signup_date\nFROM customers\nWHERE city = (\n    SELECT city\n    FROM customers\n    WHERE city IS NOT NULL\n    GROUP BY city\n    ORDER BY COUNT(*) DESC\n    LIMIT 1\n)\nORDER BY name\nLIMIT 500;",
+      "seconds": 12.89,
+      "tokens": {
+        "input": 1887,
+        "output": 63,
+        "thinking": 0
+      }
+    },
+    {
+      "id": "HO4",
+      "difficulty": "hard",
+      "question": "Show the number of orders per month for the last 6 months and the difference from the previous month.",
+      "correct": false,
+      "reason": "wrong result (6 rows vs 6 expected)",
+      "status": "success",
+      "repaired": false,
+      "failed_check": null,
+      "generated_sql": "WITH monthly_orders AS (\n    SELECT \n        strftime('%Y-%m', order_date) AS month,\n        COUNT(*) AS order_count\n    FROM orders\n    WHERE status = 'completed'\n      AND order_date >= date('2026-11-07', 'start of month', '-5 months')\n    GROUP BY strftime('%Y-%m', order_date)\n)\nSELECT \n    month,\n    order_count,\n    order_count - LAG(order_count, 1) OVER (ORDER BY month) AS difference_from_previous_month\nFROM monthly_orders\nORDER BY month\nLIMIT 500;",
+      "seconds": 1.93,
+      "tokens": {
+        "input": 1896,
+        "output": 149,
+        "thinking": 0
+      }
+    },
+    {
+      "id": "HO5",
+      "difficulty": "medium",
+      "question": "How many orders were placed by customers in Chennai last month?",
+      "correct": true,
+      "reason": "result matches reference",
+      "status": "success",
+      "repaired": false,
+      "failed_check": null,
+      "generated_sql": "SELECT COUNT(o.id) AS order_count\nFROM orders AS o\nJOIN customers AS c ON c.id = o.customer_id\nWHERE c.city = 'Chennai'\n  AND o.order_date >= date('2026-11-07', 'start of month', '-1 month')\n  AND o.order_date < date('2026-11-07', 'start of month');",
+      "seconds": 10.83,
+      "tokens": {
+        "input": 1887,
+        "output": 98,
+        "thinking": 0
+      }
+    },
+    {
+      "id": "HO6",
+      "difficulty": "medium",
+      "question": "Which products are priced above the average product price?",
+      "correct": true,
+      "reason": "result matches reference",
+      "status": "success",
+      "repaired": false,
+      "failed_check": null,
+      "generated_sql": "SELECT name, category, price\nFROM products\nWHERE price > (SELECT AVG(price) FROM products)\nORDER BY price DESC\nLIMIT 500;",
+      "seconds": 11.54,
+      "tokens": {
+        "input": 1885,
+        "output": 34,
+        "thinking": 0
+      }
+    },
+    {
+      "id": "HO7",
+      "difficulty": "medium",
+      "question": "On average, how many orders does a customer place, counting only customers who have ordered? Round to two decimals.",
+      "correct": true,
+      "reason": "result matches reference",
+      "status": "success",
+      "repaired": false,
+      "failed_check": null,
+      "generated_sql": "SELECT ROUND(AVG(order_count), 2) AS avg_orders_per_active_customer\nFROM (\n    SELECT customer_id, COUNT(*) AS order_count\n    FROM orders\n    GROUP BY customer_id\n);",
+      "seconds": 1.84,
+      "tokens": {
+        "input": 1898,
+        "output": 51,
+        "thinking": 0
+      }
+    },
+    {
+      "id": "HO8",
+      "difficulty": "easy",
+      "question": "List the cancelled orders from the last 7 days with the customer name and amount.",
+      "correct": true,
+      "reason": "result matches reference",
+      "status": "success",
+      "repaired": false,
+      "failed_check": null,
+      "generated_sql": "SELECT o.id AS order_id, c.name AS customer_name, o.total AS amount, o.order_date\nFROM orders AS o\nJOIN customers AS c ON c.id = o.customer_id\nWHERE o.status = 'cancelled'\n  AND o.order_date >= date('2026-11-07', '-7 days')\nORDER BY o.order_date DESC, o.id DESC\nLIMIT 500;",
+      "seconds": 10.39,
+      "tokens": {
+        "input": 1892,
+        "output": 104,
+        "thinking": 0
+      }
+    }
+  ]
+}

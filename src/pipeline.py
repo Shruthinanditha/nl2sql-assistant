@@ -117,6 +117,7 @@ def ask(
     today: date | None = None,
     db_path: Path | None = None,
     log_path: Path | None = None,
+    allow_repair: bool = True,
 ) -> PipelineResult:
     """
     Answer one natural-language question end to end.
@@ -127,12 +128,14 @@ def ask(
              today    - reference date (default: today)
              db_path  - database file (default: DB_PATH)
              log_path - audit log file (default: LOG_PATH); tests use a temp file
+             allow_repair - False switches the self-repair off (used by the
+                            evaluation to measure what the repair is worth)
     Output:  PipelineResult (this function does not raise for normal failures)
     """
     total_start = time.perf_counter()
     result = PipelineResult(question=question)
     try:
-        _run_steps(result, question, llm, schema or get_schema(), today, db_path)
+        _run_steps(result, question, llm, schema or get_schema(), today, db_path, allow_repair)
     except LLMError as error:
         result.status = STATUS_ERROR
         result.message = str(error)
@@ -148,6 +151,7 @@ def _run_steps(
     schema: Schema,
     today: date | None,
     db_path: Path | None,
+    allow_repair: bool,
 ) -> None:
     """The actual step-by-step logic of ask(). Fills in `result`."""
     # --- Step 1: generate SQL --------------------------------------------
@@ -171,7 +175,7 @@ def _run_steps(
         # --- Step 2: validate --------------------------------------------
         validation = _validate(result, generation.sql, schema)
         if not validation.is_safe:
-            if attempt == 1 and validation.failed_check in REPAIRABLE_CHECKS:
+            if allow_repair and attempt == 1 and validation.failed_check in REPAIRABLE_CHECKS:
                 error_for_llm = validation.reason
             else:
                 result.status = STATUS_BLOCKED
@@ -190,7 +194,7 @@ def _run_steps(
                     result.message += f" Only the first {execution.row_count} rows are shown."
                 return
             # Timeouts are not repaired: the same question would likely time out again.
-            if attempt > 1 or execution.timed_out:
+            if not allow_repair or attempt > 1 or execution.timed_out:
                 result.status, result.message = STATUS_ERROR, execution.error
                 return
             error_for_llm = execution.error

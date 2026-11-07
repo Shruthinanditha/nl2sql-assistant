@@ -1,0 +1,90 @@
+# eval/holdout.yaml
+# -----------------
+# HELD-OUT questions: written AFTER analysing the baseline failures, but BEFORE
+# changing the system, and never used to design the improvements.
+# They test the same skills as the failed questions in DIFFERENT wording:
+#   - counting / "placed an order" means every status (H3's failure)
+#   - "which X" must list the X items (H10's failure)
+#   - comparisons with the previous period need data from before the period (H2)
+# If the improvements are general (not "teaching to the test"), these improve too.
+# Same format as questions.yaml.
+
+questions:
+  - id: HO1
+    difficulty: medium
+    question: How many orders did each customer from Pune place this year?
+    expect: rows
+    reference: >
+      SELECT c.name, COUNT(o.id) FROM customers c
+      LEFT JOIN orders o ON o.customer_id = c.id AND o.order_date >= date('{today}', 'start of year')
+      WHERE c.city = 'Pune'
+      GROUP BY c.id, c.name
+    note: >
+      order count = every status; "each customer" includes customers with 0 orders.
+      Reference corrected after the held-out baseline: the first version (inner JOIN) dropped the
+      Pune customer with no orders, and the model's LEFT JOIN answer was the better reading.
+
+  - id: HO2
+    difficulty: hard
+    question: Which customers placed orders in both September and October 2026?
+    expect: rows
+    reference: >
+      SELECT c.name FROM customers c JOIN orders o ON o.customer_id = c.id
+      WHERE o.order_date >= '2026-09-01' AND o.order_date < '2026-11-01'
+      GROUP BY c.id, c.name HAVING COUNT(DISTINCT strftime('%m', o.order_date)) = 2
+    note: placed orders = every status
+
+  - id: HO3
+    difficulty: hard
+    question: Which customers live in the city that has the most customers?
+    expect: rows
+    reference: >
+      SELECT name FROM customers WHERE city = (
+        SELECT city FROM customers WHERE city IS NOT NULL GROUP BY city ORDER BY COUNT(*) DESC LIMIT 1)
+    note: which-X question -> list the customers, not the city
+
+  - id: HO4
+    difficulty: hard
+    question: Show the number of orders per month for the last 6 months and the difference from the previous month.
+    expect: rows
+    reference: >
+      SELECT month, n, diff FROM (
+        SELECT month, n, n - LAG(n) OVER (ORDER BY month) AS diff
+        FROM (SELECT strftime('%Y-%m', order_date) AS month, COUNT(*) AS n FROM orders
+              WHERE order_date >= date('{today}', 'start of month', '-6 months') GROUP BY month))
+      WHERE month >= strftime('%Y-%m', date('{today}', 'start of month', '-5 months'))
+    note: previous-period comparison must use the month before the window
+
+  - id: HO5
+    difficulty: medium
+    question: How many orders were placed by customers in Chennai last month?
+    expect: rows
+    reference: >
+      SELECT COUNT(*) FROM orders o JOIN customers c ON c.id = o.customer_id
+      WHERE c.city = 'Chennai'
+        AND o.order_date >= date('{today}', 'start of month', '-1 month')
+        AND o.order_date < date('{today}', 'start of month')
+    note: placed orders = every status
+
+  - id: HO6
+    difficulty: medium
+    question: Which products are priced above the average product price?
+    expect: rows
+    reference: SELECT name FROM products WHERE price > (SELECT AVG(price) FROM products)
+    note: which-X question -> list product names
+
+  - id: HO7
+    difficulty: medium
+    question: On average, how many orders does a customer place, counting only customers who have ordered? Round to two decimals.
+    expect: rows
+    reference: SELECT ROUND(COUNT(*) * 1.0 / COUNT(DISTINCT customer_id), 2) FROM orders
+    note: order count = every status
+
+  - id: HO8
+    difficulty: easy
+    question: List the cancelled orders from the last 7 days with the customer name and amount.
+    expect: rows
+    reference: >
+      SELECT o.id, c.name, o.total FROM orders o JOIN customers c ON c.id = o.customer_id
+      WHERE o.status = 'cancelled' AND o.order_date >= date('{today}', '-7 days')
+    note: simple control question

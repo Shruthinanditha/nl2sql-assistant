@@ -276,3 +276,45 @@ Validation takes 2–17 ms and execution 4–10 ms. Almost all the time is the L
   with `@st.cache_resource`, and never re-call the LLM just to redraw the page.
 - Pick the chart from the shape of the data. Sometimes the best "chart" is a single big number.
 - UI code can be tested automatically (AppTest), and those tests find real bugs.
+
+---
+
+## Phase 8: Evaluation (2026-11-07)
+
+**Done**
+- `eval/questions.yaml`: 40 questions with hand-checked reference SQL (10 easy, 12 medium, 10 hard, 2 ambiguous,
+  6 unsafe/unanswerable). `eval/holdout.yaml`: 8 held-out questions.
+- `eval/run_eval.py`: execution accuracy (compares result rows; ignores column names, extra columns and row order;
+  0.01 tolerance), metrics by difficulty, refusal rate, false refusals, latency, tokens. Options: `--dry-run`,
+  `--no-repair`, `--model`, `--ids`, `--questions`, `--rescore`. Results go to `eval/results/*.json`.
+- `src/pipeline.py`: an `allow_repair` switch, so the evaluation can measure the self-repair.
+- `tests/test_eval_scoring.py` (9 tests) for the scorer.
+- `docs/EVALUATION.md`: method, results, before/after table, limitations.
+- `docs/CODEBASE_GUIDE.docx`: an 87-page beginner guide to every file and function (requested by Shruthi).
+
+**Results (gemini-3.5-flash-lite)**
+| Setup | Main set (40) | Held-out (8) |
+|---|---|---|
+| Baseline (no repair) | 92.5% | 87.5% |
+| + self-repair | 87.5% (0 repairs triggered; variance) | – |
+| + "order counts include all statuses" rule | 92.5% | – |
+| + "which X lists X" + previous-period rules (final) | 95.0 / 97.5 / 97.5% → **mean 96.7%** | **100%** |
+Unsafe questions refused: 100% in every run. False refusals: 0.
+
+**Bugs found**
+- The evaluation dry run found that the validator wrongly blocked `NOT EXISTS` (sqlglot represents EXISTS as a
+  function). Fixed, with regression tests.
+- A user question ("is there any name which has bhavya") found that every `LIKE` search was refused by the database
+  authorizer, because SQLite reports LIKE/GLOB as the functions `like()`/`glob()`. Fixed, with regression tests
+  (commit `bbabce2`). No evaluation query used LIKE, so no score was affected.
+- Two reference answers (H2, HO1) were debatable. They were corrected openly and saved runs were re-scored without API calls.
+
+**How to verify**
+- `pytest`: 190 passed.
+- `python eval/run_eval.py --dry-run` scores 100%.
+
+**Learned**
+- Measure, don't guess. One run is not enough: there's ±2.5 points of variance even at temperature 0.
+- Diagnose the root cause of each failure, then fix it with a general rule, one change at a time.
+- A held-out set proves the fixes generalise. Review the answer key as critically as the model.
+- Self-repair only helps with errors, not with wrong-but-valid SQL.

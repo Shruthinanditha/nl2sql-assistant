@@ -2,7 +2,7 @@
 
 > Ask questions about a database in plain English: an LLM writes the SQL, layered safety checks verify it, and the app shows the SQL, the results table and a chart.
 
-🚧 **Status: under construction.** Phase 7 of 10 is complete: the app works end to end in the browser. Evaluation, docs and deployment come next.
+🚧 **Status: under construction.** Phase 8 of 10 is complete: the app works end to end and its accuracy is measured. Docs polish and deployment come next.
 
 <!-- SCREENSHOT: main UI with a chart (added in Phase 10) -->
 
@@ -14,7 +14,24 @@
 - Clear explanations when a query is **blocked for safety** or **cannot be answered**
 - **Self-repair:** a failing query is sent back to the AI once with the error message
 - **Safety lab:** type SQL yourself and watch the validator block attacks
-- Question history, audit log, 170 automated tests (offline, using a fake LLM) This README grows with each phase.
+- Question history, audit log, 190 automated tests (offline, using a fake LLM)
+- **Measured accuracy:** 96.7% average on a 40-question evaluation set (baseline 92.5%), 100% on held-out questions, 100% of unsafe questions refused
+
+## Evaluation results
+
+Execution accuracy (result rows compared with hand-checked reference SQL), `gemini-3.5-flash-lite`:
+
+| Setup | 40-question set | 8 held-out questions | Unsafe refused |
+|---|---|---|---|
+| Baseline | 92.5% | 87.5% | 100% |
+| Final (clearer business rule + 2 general prompt rules) | **96.7%** (mean of 95.0 / 97.5 / 97.5) | **100%** | 100% |
+
+Method, every change and its effect, remaining failures and limitations: [docs/EVALUATION.md](docs/EVALUATION.md).
+
+```powershell
+python eval/run_eval.py --dry-run --label dryrun          # checks the scorer, no API calls
+python eval/run_eval.py --label myrun                     # ~40 requests, ~3 minutes, free tier
+``` This README grows with each phase.
 
 ## How it works (preview)
 
@@ -183,14 +200,22 @@ If activation fails with "running scripts is disabled on this system", run this 
 │   ├── test_executor.py  # DB-level protections, tested WITHOUT the validator
 │   ├── test_pipeline.py  # end-to-end with FakeLLM (malicious LLM, self-repair, ...)
 │   ├── test_charts.py    # automatic chart choice
-│   └── test_app.py       # UI tests with Streamlit AppTest
+│   ├── test_app.py       # UI tests with Streamlit AppTest
+│   └── test_eval_scoring.py  # the evaluation's result comparison
+├── eval/
+│   ├── questions.yaml    # 40 questions + reference SQL
+│   ├── holdout.yaml      # 8 held-out questions
+│   ├── run_eval.py       # runs the evaluation, saves results
+│   └── results/          # every run as JSON
 ├── data/
 │   ├── seed_database.py           # builds data/shop.db (the .db itself is git-ignored)
 │   └── schema_descriptions.yaml   # descriptions + business rules + ALLOWLIST
 └── docs/
     ├── PROGRESS.md       # build log, phase by phase
     ├── DBEAVER_GUIDE.md  # DBeaver walkthrough + practice exercises
-    └── SECURITY.md       # threat model, defence layers, attack catalogue
+    ├── SECURITY.md       # threat model, defence layers, attack catalogue
+    ├── EVALUATION.md     # how accuracy was measured and improved
+    └── CODEBASE_GUIDE.docx  # beginner guide: every file and function explained
 ```
 
 ## WHAT YOU SHOULD DO (checklist)
@@ -206,6 +231,8 @@ If activation fails with "running scripts is disabled on this system", run this 
 - [ ] Read `docs/SECURITY.md` and be able to explain 5 attacks and the 6 layers (Phase 5)
 - [ ] Ask your own questions with `python scripts/ask.py "..."` and look at `logs/queries.log` (Phase 6)
 - [ ] Run `streamlit run app.py` and try every example question and the Safety lab (Phase 7)
+- [ ] Read `docs/EVALUATION.md` and be able to explain the baseline, each change and the held-out set (Phase 8)
+- [ ] Read `docs/CODEBASE_GUIDE.docx` in the recommended order
 - _More items are added as the project grows._
 
 ## License

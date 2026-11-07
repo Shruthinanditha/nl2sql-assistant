@@ -165,3 +165,33 @@ Prompt size: about 1,900 input tokens per question, which is cheap and well with
 - Injecting today's date makes relative dates deterministic and testable.
 - Few-shot examples must not overlap with evaluation questions (avoid testing on training data).
 - Cleaning LLM output must never remove anything the validator needs to see.
+
+---
+
+## Phase 5: Safety validator (2026-11-07)
+
+**Done**
+- `src/sql_validator.py`: parses SQL into an AST with sqlglot and checks size, single statement, query-only root,
+  no forbidden nodes anywhere, table allowlist (CTEs handled, no `db.table`, no table-valued functions,
+  no recursive CTEs), function allowlist, and column allowlist (via sqlglot `qualify`, which also expands `SELECT *`
+  to allowed columns). It enforces LIMIT ≤ `MAX_ROWS` and returns `ValidationResult(is_safe, reason, failed_check,
+  clean_sql, tables)`.
+- The executed SQL is **regenerated from the checked tree** ("execute what you validated").
+- `tests/test_validator.py`: 18 valid queries (each must return **identical rows** after regeneration),
+  42 attacks, 6 LIMIT cases, 1 table-list test.
+- `docs/SECURITY.md`: threat model, the 6 defence layers, the attack catalogue, honest limitations.
+
+**Bug found by the tests**
+- The first version only allowlisted *unknown* functions and trusted the ones sqlglot recognises.
+  Test A32 showed `sqlite_version()` slipping through, because sqlglot knows it. Fix: check the real function name
+  sent to SQLite for **every** function call. Added tests A32b/A32c.
+
+**How to verify**
+- `pytest -v`: 100 passed (`pytest tests/test_validator.py -v` lists each attack by name).
+- The 4 real Gemini queries from Phase 4 pass the validator and return identical rows.
+
+**Learned**
+- LLM output is untrusted input. Defence in depth: no single layer is enough.
+- AST parsing beats regex/keyword filters. Allowlists beat blocklists. Fail closed when unsure.
+- Execute exactly what you validated (regenerate the SQL from the tree).
+- Tests find real security gaps. Assumptions about libraries must be verified.

@@ -2,7 +2,7 @@
 
 > Ask questions about a database in plain English: an LLM writes the SQL, layered safety checks verify it, and the app shows the SQL, the results table and a chart.
 
-🚧 **Status: under construction.** Phase 4 of 10 is complete (project setup, sample database, LLM client, schema + prompts). This README grows with each phase.
+🚧 **Status: under construction.** Phase 5 of 10 is complete (project setup, sample database, LLM client, schema + prompts, safety validator). This README grows with each phase.
 
 ## How it works (preview)
 
@@ -60,6 +60,16 @@ python scripts/try_questions.py "Which city has the most customers?"
 That YAML file is also the **allowlist**: only listed tables/columns are shown to the LLM.
 `users_private` (sensitive) and `customers.email` (personal data) are deliberately not listed.
 `src/prompts.py` holds the rules, today's date and 7 few-shot examples.
+
+## Security design
+
+SQL written by the LLM is treated as **untrusted input** and passes six layers of defence:
+(1) prompt rules, (2) AST validation with sqlglot (one statement, SELECT only, function allowlist, no recursion),
+(3) a table/column allowlist, (4) a read-only database connection, (5) a row limit + query timeout,
+(6) the SQL is shown to the user. The SQL that runs is regenerated from the validated syntax tree.
+42 attack cases (stacked statements, UNION injection, `sqlite_master`, `ATTACH`, `PRAGMA`, hidden columns,
+`load_extension`, recursive CTEs, ...) are tested in `tests/test_validator.py`.
+Details: [docs/SECURITY.md](docs/SECURITY.md).
 
 ## LLM providers
 
@@ -120,7 +130,8 @@ If activation fails with "running scripts is disabled on this system", run this 
 │   ├── llm_client.py     # provider-agnostic LLM wrapper (+ FakeLLM for tests)
 │   ├── schema.py         # reads DB structure + descriptions, applies allowlist
 │   ├── prompts.py        # system prompt, rules, few-shot examples
-│   └── sql_generator.py  # question -> SQL (cleans fences, detects CANNOT_ANSWER)
+│   ├── sql_generator.py  # question -> SQL (cleans fences, detects CANNOT_ANSWER)
+│   └── sql_validator.py  # SECURITY CORE: AST-based safety checks (sqlglot)
 ├── scripts/
 │   ├── check_setup.py    # verifies the installation
 │   ├── hello_llm.py      # verifies the LLM key/model work
@@ -129,13 +140,15 @@ If activation fails with "running scripts is disabled on this system", run this 
 ├── tests/
 │   ├── test_llm_client.py
 │   ├── test_schema.py
-│   └── test_sql_generator.py
+│   ├── test_sql_generator.py
+│   └── test_validator.py # 18 valid queries + 42 attacks + LIMIT rules
 ├── data/
 │   ├── seed_database.py           # builds data/shop.db (the .db itself is git-ignored)
 │   └── schema_descriptions.yaml   # descriptions + business rules + ALLOWLIST
 └── docs/
     ├── PROGRESS.md       # build log, phase by phase
-    └── DBEAVER_GUIDE.md  # DBeaver walkthrough + practice exercises
+    ├── DBEAVER_GUIDE.md  # DBeaver walkthrough + practice exercises
+    └── SECURITY.md       # threat model, defence layers, attack catalogue
 ```
 
 ## WHAT YOU SHOULD DO (checklist)
@@ -148,6 +161,7 @@ If activation fails with "running scripts is disabled on this system", run this 
 - [ ] Do the 10 SQL exercises in `docs/DBEAVER_GUIDE.md` (Phase 2)
 - [x] Run `python scripts/hello_llm.py` and `pytest -v` (Phase 3)
 - [ ] Run `python scripts/try_questions.py` and compare the SQL in DBeaver (Phase 4)
+- [ ] Read `docs/SECURITY.md` and be able to explain 5 attacks and the 6 layers (Phase 5)
 - _More items are added as the project grows._
 
 ## License

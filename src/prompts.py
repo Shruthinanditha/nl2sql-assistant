@@ -156,6 +156,24 @@ def build_system_prompt(schema_text: str, today: date, max_rows: int) -> str:
     )
 
 
+def build_repair_prompt(question: str, failed_sql: str, error_message: str) -> str:
+    """
+    Build the user prompt for the ONE self-repair attempt.
+
+    We show the model its own failed SQL and the database's error message,
+    and ask for a corrected query. The system prompt (rules + schema) stays the
+    same, so all rules still apply, and the repaired SQL is validated again.
+    """
+    return (
+        f"<question>\n{question.strip()}\n</question>\n\n"
+        f"Your previous SQL for this question failed.\n"
+        f"<previous_sql>\n{failed_sql.strip()}\n</previous_sql>\n"
+        f"<error>\n{error_message.strip()}\n</error>\n\n"
+        "Write a corrected SQLite query that answers the question and follows all rules. "
+        f"If it cannot be answered with the schema, return {CANNOT_ANSWER_MARKER}: <reason>.\n\nSQL:"
+    )
+
+
 def build_user_prompt(question: str) -> str:
     """
     Wrap the user's question with clear delimiters.

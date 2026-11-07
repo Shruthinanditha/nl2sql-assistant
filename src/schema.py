@@ -27,6 +27,7 @@ import sqlite3
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import quote
 
 import yaml
 
@@ -162,12 +163,14 @@ def open_read_only(db_path: Path) -> sqlite3.Connection:
 
     The "file:...?mode=ro" URI tells SQLite itself to refuse any write.
     Reading the schema never needs to write, so we never ask for write access.
+    The path is URL-encoded because the URI format needs it (our folder has spaces).
+    (executor.py has its own copy of this to avoid a circular import.)
     """
     if not db_path.exists():
         raise FileNotFoundError(
             f"Database not found at {db_path}. Create it with: python data/seed_database.py"
         )
-    return sqlite3.connect(f"file:{db_path.as_posix()}?mode=ro", uri=True)
+    return sqlite3.connect(f"file:{quote(db_path.as_posix(), safe='/:')}?mode=ro", uri=True)
 
 
 def read_table_structure(connection: sqlite3.Connection, table: str) -> tuple[list[dict], list[ForeignKey]]:

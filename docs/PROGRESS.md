@@ -195,3 +195,45 @@ Prompt size: about 1,900 input tokens per question, which is cheap and well with
 - AST parsing beats regex/keyword filters. Allowlists beat blocklists. Fail closed when unsure.
 - Execute exactly what you validated (regenerate the SQL from the tree).
 - Tests find real security gaps. Assumptions about libraries must be verified.
+
+---
+
+## Phase 6: Read-only executor + pipeline (2026-11-07)
+
+**Done**
+- `src/executor.py`: read-only connection (URL-encoded `file:...?mode=ro` URI), a **SQLite authorizer** (allows only
+  SELECT, allowlisted table/column reads and allowlisted functions), a timeout via the progress handler, and a row cap
+  via `fetchmany(max_rows + 1)` (detects truncation). Returns `ExecutionResult` with a DataFrame and timing.
+- `src/pipeline.py`: `ask(question)` → generate → validate → execute → `PipelineResult` (status `success` /
+  `cannot_answer` / `blocked` / `error`, message, generated and executed SQL, DataFrame, timings, tokens).
+  **One** self-repair for honest mistakes only (parse error, unknown column, runtime error). Security
+  rejections and timeouts are never repaired. Every question is appended as JSON to `logs/queries.log`.
+- `src/prompts.py`: `build_repair_prompt`. `src/sql_generator.py`: `repair_sql`.
+- `scripts/ask.py`: the full pipeline from the terminal.
+- `tests/test_executor.py` (37 tests) and `tests/test_pipeline.py` (16 tests).
+
+**Security finding**
+- On a test copy, **read-only mode did not block `ATTACH DATABASE`. It created a new file on disk.** It also
+  allowed `PRAGMA journal_mode`. Hence the authorizer, which blocks both, plus private tables/columns, functions
+  and recursion, independently of sqlglot. Documented in `docs/SECURITY.md`.
+
+**Results (live, gemini-3.5-flash-lite)**
+| Question | Status | Total time |
+|---|---|---|
+| Last month's top 5 customers | success (same 5 customers as DBeaver exercise 7) | 1.53 s |
+| Revenue by month this year | success, 11 rows | 1.24 s |
+| Orders per status | success, 3 rows | 1.03 s |
+| Average delivery time per city | cannot_answer (no delivery data) | 0.96 s |
+| Delete all customers | cannot_answer (the LLM refused at layer 1) | 0.96 s |
+| Prompt injection asking for `users_private` | cannot_answer (the LLM refused at layer 1) | 0.98 s |
+
+Validation takes 2–17 ms and execution 4–10 ms. Almost all the time is the LLM call.
+
+**How to verify**
+- `pytest`: 153 passed.
+- `python scripts/ask.py "your question"`
+
+**Learned**
+- Test every layer **alone**. Read-only mode alone has gaps (ATTACH), so two independent allowlists are better.
+- Self-repair improves robustness, but it must never help an attacker, and it must not loop.
+- Measure where time goes: the LLM dominates, and the security checks are almost free.

@@ -26,7 +26,7 @@ from datetime import date
 
 from src.config import settings
 from src.llm_client import LLMClient, get_llm_client
-from src.prompts import CANNOT_ANSWER_MARKER, build_system_prompt, build_user_prompt
+from src.prompts import CANNOT_ANSWER_MARKER, build_repair_prompt, build_system_prompt, build_user_prompt
 from src.schema import Schema, get_schema
 
 # Questions longer than this are rejected: real questions are short, and very
@@ -130,12 +130,41 @@ def generate_sql(
             error=f"The question is too long ({len(question)} characters; the maximum is {MAX_QUESTION_LENGTH})."
         )
 
+    return _ask_llm(build_user_prompt(question), llm, schema, today)
+
+
+def repair_sql(
+    question: str,
+    failed_sql: str,
+    error_message: str,
+    llm: LLMClient | None = None,
+    schema: Schema | None = None,
+    today: date | None = None,
+) -> GenerationResult:
+    """
+    Ask the LLM to fix a query that failed, showing it the error message.
+
+    Same inputs as generate_sql, plus the failed SQL and its error.
+    Output: a new GenerationResult (its SQL must be validated again!).
+    """
+    return _ask_llm(build_repair_prompt(question, failed_sql, error_message), llm, schema, today)
+
+
+def _ask_llm(
+    user_prompt: str,
+    llm: LLMClient | None,
+    schema: Schema | None,
+    today: date | None,
+) -> GenerationResult:
+    """
+    Shared by generate_sql and repair_sql: build the system prompt, call the
+    LLM, time it, and turn the answer into a GenerationResult.
+    """
     llm = llm or get_llm_client()
     schema = schema or get_schema()
     today = today or date.today()
 
     system_prompt = build_system_prompt(schema.to_prompt_text(), today, settings.max_rows)
-    user_prompt = build_user_prompt(question)
 
     start = time.perf_counter()
     raw_response = llm.complete(system_prompt, user_prompt)

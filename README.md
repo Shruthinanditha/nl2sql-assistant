@@ -2,7 +2,7 @@
 
 > Ask questions about a database in plain English: an LLM writes the SQL, layered safety checks verify it, and the app shows the SQL, the results table and a chart.
 
-🚧 **Status: under construction.** Phase 5 of 10 is complete (project setup, sample database, LLM client, schema + prompts, safety validator). This README grows with each phase.
+🚧 **Status: under construction.** Phase 6 of 10 is complete (setup, sample database, LLM client, schema + prompts, safety validator, read-only executor + pipeline). The web UI comes next. This README grows with each phase.
 
 ## How it works (preview)
 
@@ -48,9 +48,11 @@ python scripts/hello_llm.py
 # 7. Run the automated tests (offline, free)
 pytest -v
 
-# 8. See the SQL the AI writes (nothing is executed yet)
-python scripts/try_questions.py
+# 8. See the SQL the AI writes (without running it)
 python scripts/try_questions.py "Which city has the most customers?"
+
+# 9. Ask a question end to end (LLM -> validator -> read-only DB -> table)
+python scripts/ask.py "Show me last month's top 5 customers"
 ```
 
 ## How the AI sees the database
@@ -65,8 +67,11 @@ That YAML file is also the **allowlist**: only listed tables/columns are shown t
 
 SQL written by the LLM is treated as **untrusted input** and passes six layers of defence:
 (1) prompt rules, (2) AST validation with sqlglot (one statement, SELECT only, function allowlist, no recursion),
-(3) a table/column allowlist, (4) a read-only database connection, (5) a row limit + query timeout,
-(6) the SQL is shown to the user. The SQL that runs is regenerated from the validated syntax tree.
+(3) a table/column allowlist, (4) a read-only database connection **plus a SQLite authorizer** that re-checks the
+allowlist inside the database engine (read-only mode alone does not block `ATTACH`; we tested it),
+(5) a row limit + query timeout, (6) the SQL is shown to the user. The SQL that runs is regenerated from the
+validated syntax tree. If a query fails because of an honest mistake, the error is sent back to the LLM **once**
+for a self-repair; security rejections are never repaired.
 42 attack cases (stacked statements, UNION injection, `sqlite_master`, `ATTACH`, `PRAGMA`, hidden columns,
 `load_extension`, recursive CTEs, ...) are tested in `tests/test_validator.py`.
 Details: [docs/SECURITY.md](docs/SECURITY.md).
@@ -130,18 +135,23 @@ If activation fails with "running scripts is disabled on this system", run this 
 │   ├── llm_client.py     # provider-agnostic LLM wrapper (+ FakeLLM for tests)
 │   ├── schema.py         # reads DB structure + descriptions, applies allowlist
 │   ├── prompts.py        # system prompt, rules, few-shot examples
-│   ├── sql_generator.py  # question -> SQL (cleans fences, detects CANNOT_ANSWER)
-│   └── sql_validator.py  # SECURITY CORE: AST-based safety checks (sqlglot)
+│   ├── sql_generator.py  # question -> SQL (cleans fences, detects CANNOT_ANSWER, repair)
+│   ├── sql_validator.py  # SECURITY CORE: AST-based safety checks (sqlglot)
+│   ├── executor.py       # read-only DB + authorizer + timeout + row cap
+│   └── pipeline.py       # ask(question): generate -> validate -> execute (+1 repair), audit log
 ├── scripts/
 │   ├── check_setup.py    # verifies the installation
 │   ├── hello_llm.py      # verifies the LLM key/model work
 │   ├── try_questions.py  # prints generated SQL for sample questions
+│   ├── ask.py            # full pipeline from the terminal
 │   └── check_secrets.py  # run before every push: no API keys in the repo
 ├── tests/
 │   ├── test_llm_client.py
 │   ├── test_schema.py
 │   ├── test_sql_generator.py
-│   └── test_validator.py # 18 valid queries + 42 attacks + LIMIT rules
+│   ├── test_validator.py # 18 valid queries + 42 attacks + LIMIT rules
+│   ├── test_executor.py  # DB-level protections, tested WITHOUT the validator
+│   └── test_pipeline.py  # end-to-end with FakeLLM (malicious LLM, self-repair, ...)
 ├── data/
 │   ├── seed_database.py           # builds data/shop.db (the .db itself is git-ignored)
 │   └── schema_descriptions.yaml   # descriptions + business rules + ALLOWLIST
@@ -162,6 +172,7 @@ If activation fails with "running scripts is disabled on this system", run this 
 - [x] Run `python scripts/hello_llm.py` and `pytest -v` (Phase 3)
 - [ ] Run `python scripts/try_questions.py` and compare the SQL in DBeaver (Phase 4)
 - [ ] Read `docs/SECURITY.md` and be able to explain 5 attacks and the 6 layers (Phase 5)
+- [ ] Ask your own questions with `python scripts/ask.py "..."` and look at `logs/queries.log` (Phase 6)
 - _More items are added as the project grows._
 
 ## License

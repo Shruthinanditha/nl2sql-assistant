@@ -1,0 +1,10 @@
+# Streamlit settings for this project (safe to commit: no secrets here).
+# Secrets would go in .streamlit/secrets.toml, which .gitignore excludes.
+
+[browser]
+# Do not send anonymous usage statistics to Streamlit.
+gatherUsageStats = false
+
+[theme]
+# Buttons and highlights use the same blue as the charts.
+primaryColor = "#2a78d6"

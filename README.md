@@ -2,7 +2,19 @@
 
 > Ask questions about a database in plain English: an LLM writes the SQL, layered safety checks verify it, and the app shows the SQL, the results table and a chart.
 
-🚧 **Status: under construction.** Phase 6 of 10 is complete (setup, sample database, LLM client, schema + prompts, safety validator, read-only executor + pipeline). The web UI comes next. This README grows with each phase.
+🚧 **Status: under construction.** Phase 7 of 10 is complete: the app works end to end in the browser. Evaluation, docs and deployment come next.
+
+<!-- SCREENSHOT: main UI with a chart (added in Phase 10) -->
+
+## Features
+
+- Ask questions in plain English; the AI writes SQLite SQL using only the allowed schema
+- Results as a table, an **automatic chart** (line for trends, bar for comparisons, big number for single values) and CSV download
+- "Show generated SQL" panel: see exactly what ran
+- Clear explanations when a query is **blocked for safety** or **cannot be answered**
+- **Self-repair:** a failing query is sent back to the AI once with the error message
+- **Safety lab:** type SQL yourself and watch the validator block attacks
+- Question history, audit log, 170 automated tests (offline, using a fake LLM) This README grows with each phase.
 
 ## How it works (preview)
 
@@ -53,7 +65,22 @@ python scripts/try_questions.py "Which city has the most customers?"
 
 # 9. Ask a question end to end (LLM -> validator -> read-only DB -> table)
 python scripts/ask.py "Show me last month's top 5 customers"
+
+# 10. Start the web app (opens http://localhost:8501; stop with Ctrl+C)
+streamlit run app.py
 ```
+
+## Example questions to try
+
+| Question | What you should see |
+|---|---|
+| Show me last month's top 5 customers by spending | bar chart + 5 rows |
+| What is the revenue by month this year? | line chart |
+| How many orders are there in each status? | bar chart (completed / cancelled / pending) |
+| How many products do we sell? | a single big number |
+| What is the average delivery time per city? | "I can't answer that" (no such data) |
+| Delete all customers | refused (read-only) |
+| Safety lab: `SELECT 1; DROP TABLE orders` | 🛡️ blocked: `multiple_statements` |
 
 ## How the AI sees the database
 
@@ -129,6 +156,8 @@ If activation fails with "running scripts is disabled on this system", run this 
 ├── .env.example          # settings template (no secrets)
 ├── .gitignore
 ├── pytest.ini            # test runner settings
+├── app.py                # Streamlit web UI
+├── .streamlit/config.toml  # UI settings (no secrets)
 ├── src/
 │   ├── __init__.py
 │   ├── config.py         # loads settings from .env
@@ -138,7 +167,8 @@ If activation fails with "running scripts is disabled on this system", run this 
 │   ├── sql_generator.py  # question -> SQL (cleans fences, detects CANNOT_ANSWER, repair)
 │   ├── sql_validator.py  # SECURITY CORE: AST-based safety checks (sqlglot)
 │   ├── executor.py       # read-only DB + authorizer + timeout + row cap
-│   └── pipeline.py       # ask(question): generate -> validate -> execute (+1 repair), audit log
+│   ├── pipeline.py       # ask(question): generate -> validate -> execute (+1 repair), audit log
+│   └── charts.py         # picks metric / line / bar / table automatically (Plotly)
 ├── scripts/
 │   ├── check_setup.py    # verifies the installation
 │   ├── hello_llm.py      # verifies the LLM key/model work
@@ -151,7 +181,9 @@ If activation fails with "running scripts is disabled on this system", run this 
 │   ├── test_sql_generator.py
 │   ├── test_validator.py # 18 valid queries + 42 attacks + LIMIT rules
 │   ├── test_executor.py  # DB-level protections, tested WITHOUT the validator
-│   └── test_pipeline.py  # end-to-end with FakeLLM (malicious LLM, self-repair, ...)
+│   ├── test_pipeline.py  # end-to-end with FakeLLM (malicious LLM, self-repair, ...)
+│   ├── test_charts.py    # automatic chart choice
+│   └── test_app.py       # UI tests with Streamlit AppTest
 ├── data/
 │   ├── seed_database.py           # builds data/shop.db (the .db itself is git-ignored)
 │   └── schema_descriptions.yaml   # descriptions + business rules + ALLOWLIST
@@ -173,6 +205,7 @@ If activation fails with "running scripts is disabled on this system", run this 
 - [ ] Run `python scripts/try_questions.py` and compare the SQL in DBeaver (Phase 4)
 - [ ] Read `docs/SECURITY.md` and be able to explain 5 attacks and the 6 layers (Phase 5)
 - [ ] Ask your own questions with `python scripts/ask.py "..."` and look at `logs/queries.log` (Phase 6)
+- [ ] Run `streamlit run app.py` and try every example question and the Safety lab (Phase 7)
 - _More items are added as the project grows._
 
 ## License

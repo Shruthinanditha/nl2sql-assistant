@@ -75,6 +75,14 @@ VALID_QUERIES = {
         "SELECT c.name FROM customers c LEFT JOIN orders o ON o.customer_id = c.id WHERE o.id IS NULL"
     ),
     "subquery IN": "SELECT name FROM products WHERE id IN (SELECT product_id FROM order_items WHERE quantity = 3)",
+    "NOT EXISTS (regression)": (
+        "SELECT c.name FROM customers c WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id)"
+    ),
+    "EXISTS": "SELECT p.name FROM products p WHERE EXISTS (SELECT 1 FROM order_items oi WHERE oi.product_id = p.id)",
+    # Regression: LIKE / GLOB are reported to the authorizer as functions like() / glob().
+    "LIKE text search (regression)": "SELECT name, city FROM customers WHERE name LIKE '%bhavya%'",
+    "NOT LIKE": "SELECT name FROM products WHERE name NOT LIKE 'W%'",
+    "GLOB": "SELECT name FROM products WHERE name GLOB '*Shoes*'",
     "COALESCE + GROUP BY": "SELECT COALESCE(city, 'Unknown') AS city, COUNT(*) AS n FROM customers GROUP BY 1",
     "CASE WHEN": (
         "SELECT CASE WHEN total > 5000 THEN 'big' ELSE 'small' END AS size, COUNT(*) AS n "

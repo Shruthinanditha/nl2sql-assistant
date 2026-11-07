@@ -72,11 +72,18 @@ FORBIDDEN_NODE_TYPES = tuple(
 # Lesson learned: an earlier version trusted every function sqlglot "knows";
 # the test suite showed that sqlite_version() slipped through that way.
 ALLOWED_FUNCTIONS = {
+    # SQL syntax that sqlglot represents as a function node: EXISTS (SELECT ...).
+    # (Found by the evaluation dry run: without it, NOT EXISTS was wrongly blocked.)
+    "exists",
     # type conversion
     "cast",
     # date / time
     "date", "time", "datetime", "julianday", "unixepoch", "strftime", "timediff",
-    # text
+    # text. SQLite runs the LIKE and GLOB operators internally as the functions
+    # like() and glob(), and reports them to the executor's authorizer under those
+    # names. (Bug found by a user question: without these, every text search such as
+    # name LIKE '%bhavya%' was refused by the database.)
+    "like", "glob",
     "lower", "upper", "length", "trim", "ltrim", "rtrim", "replace", "substr",
     "substring", "instr", "printf", "format",
     # numbers

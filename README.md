@@ -2,7 +2,7 @@
 
 > Ask questions about a database in plain English: an LLM writes the SQL, layered safety checks verify it, and the app shows the SQL, the results table and a chart.
 
-🚧 **Status: under construction.** Phase 3 of 10 is complete (project setup, sample database, LLM client). This README grows with each phase.
+🚧 **Status: under construction.** Phase 4 of 10 is complete (project setup, sample database, LLM client, schema + prompts). This README grows with each phase.
 
 ## How it works (preview)
 
@@ -47,7 +47,19 @@ python scripts/hello_llm.py
 
 # 7. Run the automated tests (offline, free)
 pytest -v
+
+# 8. See the SQL the AI writes (nothing is executed yet)
+python scripts/try_questions.py
+python scripts/try_questions.py "Which city has the most customers?"
 ```
+
+## How the AI sees the database
+
+`src/schema.py` reads the real table structure from SQLite and merges it with
+`data/schema_descriptions.yaml` (meanings, business rules, real example values).
+That YAML file is also the **allowlist**: only listed tables/columns are shown to the LLM.
+`users_private` (sensitive) and `customers.email` (personal data) are deliberately not listed.
+`src/prompts.py` holds the rules, today's date and 7 few-shot examples.
 
 ## LLM providers
 
@@ -105,14 +117,22 @@ If activation fails with "running scripts is disabled on this system", run this 
 ├── src/
 │   ├── __init__.py
 │   ├── config.py         # loads settings from .env
-│   └── llm_client.py     # provider-agnostic LLM wrapper (+ FakeLLM for tests)
+│   ├── llm_client.py     # provider-agnostic LLM wrapper (+ FakeLLM for tests)
+│   ├── schema.py         # reads DB structure + descriptions, applies allowlist
+│   ├── prompts.py        # system prompt, rules, few-shot examples
+│   └── sql_generator.py  # question -> SQL (cleans fences, detects CANNOT_ANSWER)
 ├── scripts/
 │   ├── check_setup.py    # verifies the installation
-│   └── hello_llm.py      # verifies the LLM key/model work
+│   ├── hello_llm.py      # verifies the LLM key/model work
+│   ├── try_questions.py  # prints generated SQL for sample questions
+│   └── check_secrets.py  # run before every push: no API keys in the repo
 ├── tests/
-│   └── test_llm_client.py
+│   ├── test_llm_client.py
+│   ├── test_schema.py
+│   └── test_sql_generator.py
 ├── data/
-│   └── seed_database.py  # builds data/shop.db (the .db itself is git-ignored)
+│   ├── seed_database.py           # builds data/shop.db (the .db itself is git-ignored)
+│   └── schema_descriptions.yaml   # descriptions + business rules + ALLOWLIST
 └── docs/
     ├── PROGRESS.md       # build log, phase by phase
     └── DBEAVER_GUIDE.md  # DBeaver walkthrough + practice exercises
@@ -127,6 +147,7 @@ If activation fails with "running scripts is disabled on this system", run this 
 - [ ] Connect DBeaver to `data/shop.db` and check the row counts (Phase 2)
 - [ ] Do the 10 SQL exercises in `docs/DBEAVER_GUIDE.md` (Phase 2)
 - [x] Run `python scripts/hello_llm.py` and `pytest -v` (Phase 3)
+- [ ] Run `python scripts/try_questions.py` and compare the SQL in DBeaver (Phase 4)
 - _More items are added as the project grows._
 
 ## License

@@ -1,0 +1,90 @@
+# schema_descriptions.yaml
+# ------------------------
+# Human-written knowledge about the database, merged with the real structure
+# that src/schema.py reads from SQLite.
+#
+# THIS FILE IS ALSO THE ALLOWLIST (security):
+#   - Only tables listed under `tables:` are shown to the LLM and may be queried.
+#   - Only columns listed under a table's `columns:` are shown and may be used.
+#   - Anything NOT listed is invisible to the AI and blocked by the validator.
+#     `users_private` is deliberately not listed (sensitive data), and
+#     `customers.email` is deliberately not listed (personal data / PII).
+#
+# Tips for good descriptions (they directly improve SQL accuracy):
+#   - Say what a value MEANS (units, currency, how it is calculated).
+#   - Write down business rules (what counts as "revenue"?).
+#   - `show_values: true` makes schema.py read the distinct values from the
+#     database and show them to the LLM, so it uses 'completed' and not 'Completed'.
+
+database_description: >
+  Orders database of an Indian online shop. All money amounts are in INR (Indian Rupees).
+  Dates are stored as TEXT in ISO format 'YYYY-MM-DD'.
+
+# Business rules the LLM must follow. These are added to the prompt as notes.
+notes:
+  - "Revenue / sales / spending means orders with status = 'completed' only, unless the question explicitly asks about other statuses."
+  - "For order-level money use orders.total. For product- or category-level money use order_items.quantity * order_items.unit_price."
+  - "order_items.unit_price is the price actually paid (may include a discount); products.price is today's list price."
+  - "Some customers have a NULL city. Some customers have never placed an order."
+
+tables:
+  customers:
+    description: "People who registered at the shop. One row per customer."
+    columns:
+      id:
+        description: "Unique customer id."
+      name:
+        description: "Full name of the customer, e.g. 'Ananya Nair'."
+      city:
+        description: "City where the customer lives. May be NULL (unknown)."
+        show_values: true
+      country:
+        description: "Country of the customer."
+        show_values: true
+      signup_date:
+        description: "Date the customer registered ('YYYY-MM-DD')."
+      # email is intentionally NOT listed: personal data is hidden from the assistant.
+
+  products:
+    description: "Products sold by the shop. One row per product."
+    columns:
+      id:
+        description: "Unique product id."
+      name:
+        description: "Product name, e.g. 'Wireless Earbuds'."
+      category:
+        description: "Product category."
+        show_values: true
+      price:
+        description: "Current list price in INR."
+
+  orders:
+    description: "Orders placed by customers. One row per order."
+    columns:
+      id:
+        description: "Unique order id."
+      customer_id:
+        description: "The customer who placed the order (customers.id)."
+      order_date:
+        description: "Date the order was placed ('YYYY-MM-DD')."
+      status:
+        description: "Order status. Only 'completed' orders count as revenue."
+        show_values: true
+      total:
+        description: "Order amount in INR = sum of quantity * unit_price of its order_items."
+
+  order_items:
+    description: "Lines of an order: which product, how many, at what price. One row per product per order."
+    columns:
+      id:
+        description: "Unique order line id."
+      order_id:
+        description: "The order this line belongs to (orders.id)."
+      product_id:
+        description: "The product bought (products.id)."
+      quantity:
+        description: "Number of units bought (1 or more)."
+      unit_price:
+        description: "Price actually paid per unit in INR (may be discounted)."
+
+  # users_private: intentionally NOT listed -> never visible, never queryable.

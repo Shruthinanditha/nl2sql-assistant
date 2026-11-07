@@ -125,3 +125,43 @@ Observed: even when told "return only SQL", the model wrapped its answer in ````
 - The adapter pattern: the app depends on one small interface, not on a vendor SDK.
 - Model availability changes fast. Check live instead of trusting tutorials (2.5 was already retired).
 - Free tiers have overload (503) and rate limits (429), so retries with backoff matter.
+
+---
+
+## Phase 4: Schema + prompt engineering (2026-11-07)
+
+**Done**
+- `data/schema_descriptions.yaml`: descriptions, business rules (revenue = completed orders only, INR,
+  `unit_price` vs `price`), and the **allowlist**. `users_private` is not listed (sensitive table), and
+  `customers.email` is not listed (personal data, a column-level allowlist).
+- `src/schema.py`: reads the real structure with `PRAGMA table_info` / `PRAGMA foreign_key_list` (read-only
+  connection), merges the YAML, keeps only allowlisted tables/columns, reads real distinct values for
+  `show_values` columns, and formats everything as commented `CREATE TABLE` text. YAML typos raise an error.
+- `src/prompts.py`: a system prompt with role, 9 rules, today's date injected (with exact meanings of "last month",
+  "this year", ...), the schema, and 7 few-shot examples (5 SQL + 2 `CANNOT_ANSWER`). The question goes
+  in `<question>` tags.
+- `src/sql_generator.py`: calls the LLM, strips markdown fences and chatter (but never cuts the SQL itself),
+  detects `CANNOT_ANSWER`, and rejects empty or too-long questions without spending tokens.
+- `scripts/try_questions.py`, `scripts/check_secrets.py`, `tests/test_schema.py`, `tests/test_sql_generator.py`.
+
+**Results (gemini-3.5-flash-lite, live)**
+| Question | Result | Time |
+|---|---|---|
+| Last month's top 5 customers by spending | correct, **identical** to DBeaver exercise 7 | 1.9 s |
+| Revenue per month this year | correct, **identical** to DBeaver exercise 6 | 1.2 s |
+| Orders in each status | correct | 1.5 s |
+| Category with most units, last 90 days | correct | 1.3 s |
+| Emails of customers in Chennai | correctly refused (`CANNOT_ANSWER`, email is hidden) | 1.0 s |
+
+Prompt size: about 1,900 input tokens per question, which is cheap and well within free-tier limits.
+
+**How to verify**
+- `pytest -v`: 32 passed.
+- `python scripts/try_questions.py` prints the SQL for 5 questions. Paste them into DBeaver and compare.
+
+**Learned**
+- The LLM only knows what the prompt tells it, so the schema description quality drives the SQL quality.
+- Allowlist > blocklist: list what is allowed, and everything else is invisible by default.
+- Injecting today's date makes relative dates deterministic and testable.
+- Few-shot examples must not overlap with evaluation questions (avoid testing on training data).
+- Cleaning LLM output must never remove anything the validator needs to see.

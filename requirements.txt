@@ -1,0 +1,31 @@
+# requirements.txt
+# ----------------
+# The list of Python packages this project needs.
+# Install them (inside the activated virtual environment) with:
+#     pip install -r requirements.txt
+#
+# Versions are pinned with "==" so that everyone (you, a recruiter cloning the
+# repo, Streamlit Cloud) gets exactly the same versions and the same behaviour.
+# Versions were checked against PyPI on 2026-11-07.
+
+# --- Web UI ---
+streamlit==1.67.0        # turns a Python script into a web app (app.py)
+
+# --- Data handling and charts ---
+pandas==3.1.1            # tables of data in Python (DataFrames) - query results
+plotly==7.1.0            # interactive charts (bar / line) shown in the UI
+
+# --- SQL safety ---
+sqlglot==30.30.0         # parses SQL into a tree (AST) so we can inspect it safely
+
+# --- Configuration ---
+python-dotenv==1.2.4     # reads secrets/settings from the .env file
+pyyaml==6.0.3            # reads .yaml files (schema descriptions, eval questions)
+
+# --- Testing ---
+pytest==9.2.0            # runs the automated tests in tests/
+
+# --- LLM provider SDK (only the one you use) ---
+google-genai==3.0.0      # Google's official Gemini SDK (NOT the old "google-generativeai")
+# anthropic              # uncomment + pin if you switch LLM_PROVIDER to "anthropic"
+# (ollama needs no SDK: we will talk to it over plain HTTP)

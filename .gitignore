@@ -1,0 +1,33 @@
+# .gitignore
+# ----------
+# Files and folders git must NEVER track or upload to GitHub.
+
+# --- Secrets (MOST IMPORTANT) ---
+# .env holds your real API key. Only .env.example (no real values) is committed.
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# --- Python virtual environment (rebuilt from requirements.txt) ---
+.venv/
+venv/
+
+# --- Python cache files (auto-generated, useless to others) ---
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# --- Generated database (rebuilt by data/seed_database.py) ---
+data/*.db
+data/*.db-journal
+
+# --- Logs (may contain questions/SQL; personal and noisy) ---
+logs/
+*.log
+
+# --- Editor / OS clutter ---
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

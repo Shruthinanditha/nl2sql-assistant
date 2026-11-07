@@ -237,3 +237,42 @@ Validation takes 2–17 ms and execution 4–10 ms. Almost all the time is the L
 - Test every layer **alone**. Read-only mode alone has gaps (ATTACH), so two independent allowlists are better.
 - Self-repair improves robustness, but it must never help an attacker, and it must not loop.
 - Measure where time goes: the LLM dominates, and the security checks are almost free.
+
+---
+
+## Phase 7: Streamlit UI (2026-11-07)
+
+**Done**
+- `app.py`: a question form, 6 example-question buttons (including an unanswerable one and a destructive one),
+  the result with an automatic chart or a big-number metric, the table, CSV download, a "Show generated SQL" panel
+  (the executed SQL plus the AI's original), and clear messages for blocked / can't-answer / error. The sidebar
+  has a clickable history (last 10) and the model name. There's a "How it works & safety" expander, and a
+  **Safety lab** (type SQL directly and see the validator's verdict, with no AI involved).
+- `src/charts.py`: picks **metric** (1 row, 1 number), **line** (date/month + number), **bar** (category + number,
+  ≤ 30 rows; horizontal for long labels or many bars), or **table**. One measure and one axis per chart. A single
+  blue `#2a78d6` (contrast validated for light and dark mode), 2px lines, rounded bars, faint grid, hover tooltips.
+- `.streamlit/config.toml`: no usage statistics; theme colour matches the charts.
+- `tests/test_charts.py` (10 tests), `tests/test_app.py` (7 UI tests with Streamlit `AppTest` + FakeLLM).
+
+**Bug found by the UI tests**
+- The sidebar history lagged one question behind, because the sidebar was drawn before the new question was
+  processed. Fixed by drawing the sidebar at the end of the script.
+
+**Live check (real Gemini via AppTest)**
+| Question | Result |
+|---|---|
+| Top 5 customers last month | 5 rows, bar chart |
+| Revenue by month this year | 11 rows, line chart |
+| Orders in each status | 3 rows, bar chart |
+| Salaries from the employees table | "I can't answer that" (no such data) |
+| Delete all customers | "I can't answer that" (read-only) |
+
+**How to verify**
+- `pytest`: 170 passed.
+- `streamlit run app.py` opens http://localhost:8501.
+
+**Learned**
+- Streamlit re-runs the whole script on every interaction: keep state in `st.session_state`, cache slow objects
+  with `@st.cache_resource`, and never re-call the LLM just to redraw the page.
+- Pick the chart from the shape of the data. Sometimes the best "chart" is a single big number.
+- UI code can be tested automatically (AppTest), and those tests find real bugs.

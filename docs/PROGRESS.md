@@ -86,3 +86,42 @@ A phase-by-phase record of what was built, how to verify it, and what was learne
 - Commit the *script* that creates data, not the binary data file. It's reproducible and keeps the repo small.
 - Relative dates keep "last month" questions meaningful whenever the demo runs.
 - Always verify generated data (consistency checks, distribution by month) instead of trusting the generator.
+
+---
+
+## Phase 3: LLM client (2026-11-07)
+
+**Done**
+- `src/llm_client.py`: one interface, `complete(system_prompt, user_prompt) -> str`, with adapters for
+  **Gemini** (`google-genai` SDK), **Anthropic** (`anthropic` SDK, not installed or tested yet), **Ollama** (plain HTTP)
+  and **FakeLLM** (canned answers for tests). `get_llm_client()` picks the adapter from `.env`.
+- Temperature 0 (deterministic SQL). Automatic retries (3 attempts, 2 s → 4 s backoff) for 429/500/502/503.
+  504 timeouts are not retried, because each one already waited the full timeout.
+- Every error becomes an `LLMError` with plain-English advice. Token usage is recorded per call.
+- `scripts/hello_llm.py` (connection check), `tests/test_llm_client.py` (12 offline tests), `pytest.ini`.
+
+**Model selection: tested live on the free tier, 2026-11-07**
+| Model | Result | Latency |
+|---|---|---|
+| gemini-3.5-flash-lite | ✅ 3/3 | 1.0–1.6 s |
+| gemini-3.5-flash | ✅ 2/3 (one 503) | 7.7–17.7 s (a "thinking" model: 800–1,200 hidden tokens) |
+| gemini-3.1-flash-lite | ✅ 1/1 | 12.5 s |
+| gemini-3.6 / 3.7 / 3.8-flash | ❌ 503 overloaded / 504 timeouts | – |
+| gemini-2.5-flash(-lite) | ❌ 404, retired for new users | – |
+
+→ **Default: `gemini-3.5-flash-lite`**. We'll compare it with 3.5-flash in Phase 8.
+Observed: even when told "return only SQL", the model wrapped its answer in ```` ```sql ```` fences, so Phase 4 must strip them.
+
+**Files created**
+`src/llm_client.py`, `scripts/hello_llm.py`, `tests/test_llm_client.py`, `pytest.ini`
+
+**How to verify**
+- `pytest -v`: 12 passed (no network needed).
+- `python scripts/hello_llm.py`: a one-sentence hello and `RESULT: the LLM connection works.`
+- Error handling, tested live: a wrong model name gives a 404 with advice; a bad key gives 400 "API key was rejected".
+
+**Learned**
+- Tokens, temperature, and system vs user prompts.
+- The adapter pattern: the app depends on one small interface, not on a vendor SDK.
+- Model availability changes fast. Check live instead of trusting tutorials (2.5 was already retired).
+- Free tiers have overload (503) and rate limits (429), so retries with backoff matter.

@@ -2,7 +2,7 @@
 
 > Ask questions about a database in plain English: an LLM writes the SQL, layered safety checks verify it, and the app shows the SQL, the results table and a chart.
 
-🚧 **Status: under construction.** Phase 2 of 10 is complete (project setup, sample database). This README grows with each phase.
+🚧 **Status: under construction.** Phase 3 of 10 is complete (project setup, sample database, LLM client). This README grows with each phase.
 
 ## How it works (preview)
 
@@ -41,7 +41,25 @@ python scripts/check_setup.py
 
 # 5. Create the sample database (data/shop.db)
 python data/seed_database.py
+
+# 6. Check that the LLM connection works (uses a few tokens)
+python scripts/hello_llm.py
+
+# 7. Run the automated tests (offline, free)
+pytest -v
 ```
+
+## LLM providers
+
+All LLM calls go through `src/llm_client.py` (`complete(system_prompt, user_prompt) -> str`).
+You switch provider by changing `.env`; no code changes are needed.
+
+| `LLM_PROVIDER` | Cost | Notes |
+|---|---|---|
+| `gemini` (default) | Free tier | Model `gemini-3.5-flash-lite`, chosen by live testing (fast, ~1-2 s) |
+| `anthropic` | Pay as you go | `pip install anthropic`; set a spending limit in the Anthropic Console |
+| `ollama` | Free, local | Needs Ollama installed; slow without a dedicated GPU |
+| `fake` | Free | Canned answers; used by the tests |
 
 ## Sample database
 
@@ -66,7 +84,7 @@ If activation fails with "running scripts is disabled on this system", run this 
 | Variable | Meaning | Default |
 |---|---|---|
 | `LLM_PROVIDER` | `gemini`, `anthropic`, `ollama` or `fake` | `gemini` |
-| `LLM_MODEL` | Model name for the provider | set in Phase 3 |
+| `LLM_MODEL` | Model name for the provider (empty = provider default) | `gemini-3.5-flash-lite` |
 | `GEMINI_API_KEY` | Your Gemini key (secret) | – |
 | `ANTHROPIC_API_KEY` | Claude API key, if using `anthropic` | – |
 | `OLLAMA_HOST` | Local Ollama server URL | `http://localhost:11434` |
@@ -83,11 +101,16 @@ If activation fails with "running scripts is disabled on this system", run this 
 ├── requirements.txt
 ├── .env.example          # settings template (no secrets)
 ├── .gitignore
+├── pytest.ini            # test runner settings
 ├── src/
 │   ├── __init__.py
-│   └── config.py         # loads settings from .env
+│   ├── config.py         # loads settings from .env
+│   └── llm_client.py     # provider-agnostic LLM wrapper (+ FakeLLM for tests)
 ├── scripts/
-│   └── check_setup.py    # verifies the installation
+│   ├── check_setup.py    # verifies the installation
+│   └── hello_llm.py      # verifies the LLM key/model work
+├── tests/
+│   └── test_llm_client.py
 ├── data/
 │   └── seed_database.py  # builds data/shop.db (the .db itself is git-ignored)
 └── docs/
@@ -103,6 +126,7 @@ If activation fails with "running scripts is disabled on this system", run this 
 - [x] Run `python data/seed_database.py` to create the database (Phase 2)
 - [ ] Connect DBeaver to `data/shop.db` and check the row counts (Phase 2)
 - [ ] Do the 10 SQL exercises in `docs/DBEAVER_GUIDE.md` (Phase 2)
+- [x] Run `python scripts/hello_llm.py` and `pytest -v` (Phase 3)
 - _More items are added as the project grows._
 
 ## License
